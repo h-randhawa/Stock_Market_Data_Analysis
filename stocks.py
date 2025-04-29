@@ -6,6 +6,7 @@ AI: ChatGPT
 """
 import sys
 import requests
+import statistics
 from datetime import datetime
 
 def date_n_years_ago(n):
@@ -28,11 +29,38 @@ def download_data(ticker):
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        data = response.json()
-        return data
+        return response.json()
     except Exception as e:
         print(f"Error fetching data for {ticker}: {e}")
         return None
+
+def process_data(data):
+    try:
+        rows = data["data"]["tradesTable"]["rows"]
+    except (KeyError, TypeError) as e:
+        print(f"Data format error: {e}")
+        return None
+
+    closing_prices = []
+    for entry in rows:
+        if "close" in entry:
+            price_str = entry["close"]
+            try:
+                price = float(price_str.replace("$", "").replace(",", "").strip())
+                closing_prices.append(price)
+            except ValueError:
+                continue
+
+    if not closing_prices:
+        return None
+
+    stats = {
+        "min": min(closing_prices),
+        "max": max(closing_prices),
+        "avg": statistics.mean(closing_prices),
+        "median": statistics.median(closing_prices)
+    }
+    return stats
 
 if __name__ == "__main__":
     for ticker in sys.argv[1:]:
@@ -40,4 +68,8 @@ if __name__ == "__main__":
         print(f"Fetching data for {ticker}...")
         data = download_data(ticker)
         if data:
-            print(data)  # just print raw data for now
+            stats = process_data(data)
+            if stats:
+                print(f"{ticker} stats: {stats}")
+            else:
+                print(f"Failed to process stats for {ticker}")
