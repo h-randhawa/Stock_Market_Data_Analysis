@@ -7,6 +7,7 @@ AI: ChatGPT
 import sys
 import requests
 import statistics
+import json
 from datetime import datetime
 
 def date_n_years_ago(n):
@@ -62,14 +63,40 @@ def process_data(data):
     }
     return stats
 
+def save_to_json(ticker, stats, filename="stocks.json"):
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = []
+
+    updated = False
+    for entry in data:
+        if entry.get("ticker") == ticker:
+            entry.update(stats)
+            updated = True
+            break
+
+    if not updated:
+        new_entry = stats.copy()
+        new_entry["ticker"] = ticker
+        data.append(new_entry)
+
+    try:
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"Error writing to {filename}: {e}")
+
 if __name__ == "__main__":
     for ticker in sys.argv[1:]:
         ticker = ticker.upper().strip()
-        print(f"Fetching data for {ticker}...")
+        print(f"Processing {ticker}...")
         data = download_data(ticker)
         if data:
             stats = process_data(data)
             if stats:
-                print(f"{ticker} stats: {stats}")
+                print(f"Stats for {ticker}: {stats}")
+                save_to_json(ticker, stats)
             else:
                 print(f"Failed to process stats for {ticker}")
